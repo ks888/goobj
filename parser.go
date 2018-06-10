@@ -16,6 +16,7 @@ var magicFooter = []byte("\xffgo19ld")
 type File struct {
 	symbols          []Symbol
 	symbolReferences []SymbolReference
+	Data             []byte
 }
 
 // SymbolReference represents a symbol's name and its version.
@@ -407,7 +408,6 @@ func Parse(f *os.File) (*File, error) {
 type parser struct {
 	reader       readerWithCounter
 	currDataAddr int64
-	Err          error
 	File
 }
 
@@ -415,117 +415,127 @@ func newParser(raw *bufio.Reader) *parser {
 	return &parser{reader: readerWithCounter{raw: raw}}
 }
 
-func (p *parser) skipHeader() {
-	if p.Err != nil {
-		return
-	}
-
+func (p *parser) skipHeader() error {
 	buff := make([]byte, len(magicHeader))
-	_, err := p.reader.read(buff)
-	if err != nil {
-		p.Err = err
-		return
+	_ = p.reader.read(buff)
+	if p.reader.err != nil {
+		return p.reader.err
 	}
 
 	for !reflect.DeepEqual(buff, magicHeader) {
-		b, err := p.reader.readByte()
-		if err != nil {
-			p.Err = err
-			return
+		b := p.reader.readByte()
+		if p.reader.err != nil {
+			return p.reader.err
 		}
 
 		buff = append(buff[1:], b)
 	}
+	return nil
 }
 
-func (p *parser) checkVersion() {
-	if p.Err != nil {
-		return
-	}
-
-	version, err := p.reader.readByte()
-	if err != nil {
-		p.Err = err
-		return
+func (p *parser) checkVersion() error {
+	version := p.reader.readByte()
+	if p.reader.err != nil {
+		return p.reader.err
 	}
 
 	if version != 1 {
-		p.Err = fmt.Errorf("unexpected version: %d", version)
+		return fmt.Errorf("unexpected version: %d", version)
 	}
+	return nil
 }
 
-func (p *parser) skipDependencies() {
-	if p.Err != nil {
-		return
-	}
-
+func (p *parser) skipDependencies() error {
 	for {
-		b, err := p.reader.readByte()
-		if err != nil {
-			p.Err = err
-			return
+		b := p.reader.readByte()
+		if p.reader.err != nil {
+			return p.reader.err
 		}
 
 		if b == 0 {
-			return
+			return nil
 		}
 	}
 }
 
-func (p *parser) readReferences() {
-	if p.Err != nil {
-		return
-	}
-
+func (p *parser) readReferences() error {
 	for {
-		b, err := p.reader.readByte()
-		if err != nil {
-			p.Err = err
-			return
+		b := p.reader.readByte()
+		if p.reader.err != nil {
+			return p.reader.err
 		}
 
 		if b == 0xff {
-			return
+			return nil
 		} else if b != 0xfe {
-			p.Err = fmt.Errorf("sanity check failed: %#x ", b)
-			return
+			return fmt.Errorf("sanity check failed: %#x ", b)
 		}
 
-		p.readReference()
-		if p.Err != nil {
-			return
+		if err := p.readReference(); err != nil {
+			return err
 		}
 	}
 }
 
-func (p *parser) readReference() {
-	symbolName, err := p.reader.readString()
-	if err != nil {
-		p.Err = err
-		return
+func (p *parser) readReference() error {
+	symbolName := p.reader.readString()
+	if p.reader.err != nil {
+		return p.reader.err
 	}
 
-	symbolVersion, err := p.reader.readVarint()
-	if err != nil {
-		p.Err = err
-		return
+	symbolVersion := p.reader.readVarint()
+	if p.reader.err != nil {
+		return p.reader.err
 	}
 
 	p.symbolReferences = append(p.symbolReferences, SymbolReference{symbolName, symbolVersion})
+	return nil
 }
 
+func (p *parser) readData() error {
+	dataLength := p.reader.readVarint()
+	if p.reader.err != nil {
+		return p.reader.err
+	}
+	_ = p.reader.readVarint() // reloc
+	_ = p.reader.readVarint() // pcdata
+	_ = p.reader.readVarint() // automatics
+	_ = p.reader.readVarint() // funcdata
+	_ = p.reader.readVarint() // files
+
+	p.Data = make([]byte, dataLength)
+	numRead := 0
+	for numRead != int(dataLength) {
+		n := p.reader.read(p.Data[numRead:])
+		if p.reader.err != nil {
+			return p.reader.err
+		}
+		numRead += n
+	}
+
+	return nil
+}
+
+func (p *parser) readSymbol() error {
+	return nil
+}
+
+// readerWithCounter is bufio.Reader which records the number of read bytes.
+// When an error happens, it updates an error field rather than returning it, so that
+// the error handling can be delayed. No read operation will be taken if the error field is not nil.
 type readerWithCounter struct {
 	raw          *bufio.Reader
 	numReadBytes int64
+	err          error
 }
 
-func (r *readerWithCounter) readVarint() (int64, error) {
+func (r *readerWithCounter) readVarint() int64 {
 	var value uint64
 	var shift uint64
 	for {
-		b, err := r.readByte()
-		if err != nil {
-			return 0, err
+		b := r.readByte()
+		if r.err != nil {
+			return 0
 		}
 
 		value += uint64(b&0x7f) << shift
@@ -534,36 +544,44 @@ func (r *readerWithCounter) readVarint() (int64, error) {
 		}
 		shift += 7
 	}
-	return zigzagDecode(value), nil
+	return zigzagDecode(value)
 }
 
-func (r *readerWithCounter) readString() (string, error) {
-	len, err := r.readVarint()
-	if err != nil {
-		return "", err
+func (r *readerWithCounter) readString() string {
+	len := r.readVarint()
+	if r.err != nil {
+		return ""
 	}
 
 	buff := make([]byte, len)
 	numRead := 0
 	for numRead != int(len) {
-		n, err := r.read(buff[numRead:])
-		if err != nil {
-			return "", err
+		n := r.read(buff[numRead:])
+		if r.err != nil {
+			return ""
 		}
 		numRead += n
 	}
 
-	return string(buff), nil
+	return string(buff)
 }
 
-func (r *readerWithCounter) readByte() (b byte, err error) {
-	b, err = r.raw.ReadByte()
+func (r *readerWithCounter) readByte() (b byte) {
+	if r.err != nil {
+		return
+	}
+
+	b, r.err = r.raw.ReadByte()
 	r.numReadBytes++
 	return
 }
 
-func (r *readerWithCounter) read(p []byte) (n int, err error) {
-	n, err = r.raw.Read(p)
+func (r *readerWithCounter) read(p []byte) (n int) {
+	if r.err != nil {
+		return
+	}
+
+	n, r.err = r.raw.Read(p)
 	r.numReadBytes += int64(n)
 	return
 }
