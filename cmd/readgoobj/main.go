@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s [goobj-file]\n", os.Args[0])
+		fmt.Printf("Usage: %s [go object file]\n", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -21,8 +21,8 @@ func main() {
 	}
 	defer f.Close()
 
-	parser := goobj.NewGoObjParser(f)
-	if err = parser.Parse(); err != nil {
+	_, err = goobj.Parse(f)
+	if err != nil {
 		fmt.Printf("failed to parse goobj file: %v\n", err)
 		os.Exit(1)
 	}

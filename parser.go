@@ -402,7 +402,32 @@ type DataAddr struct {
 
 // Parse parses a given go object file
 func Parse(f *os.File) (*File, error) {
-	return nil, nil
+	parser := newParser(bufio.NewReader(f))
+	if err := parser.skipHeader(); err != nil {
+		return nil, err
+	}
+
+	if err := parser.checkVersion(); err != nil {
+		return nil, err
+	}
+
+	if err := parser.skipDependencies(); err != nil {
+		return nil, err
+	}
+
+	if err := parser.parseReferences(); err != nil {
+		return nil, err
+	}
+
+	if err := parser.parseData(); err != nil {
+		return nil, err
+	}
+
+	if err := parser.parseSymbols(); err != nil {
+		return nil, err
+	}
+
+	return &parser.File, parser.skipFooter()
 }
 
 type parser struct {
