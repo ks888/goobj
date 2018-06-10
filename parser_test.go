@@ -2,6 +2,7 @@ package goobj
 
 import (
 	"bufio"
+	"bytes"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,66 +18,50 @@ func TestParser_skipHeader(t *testing.T) {
 		{in: "\x00\x00go19l\x00\x00go19ld", expected: 15},
 	} {
 		p := newParser(bufio.NewReader(strings.NewReader(testData.in)))
-		err := p.skipHeader()
-		if err != nil {
+		if err := p.skipHeader(); err != nil {
 			t.Errorf("[%d] error should be nil, but %v", i, err)
-		}
-		if p.reader.numReadBytes != testData.expected {
-			t.Errorf("[%d] the number of read bytes should be %d, but %d", i, testData.expected, p.reader.numReadBytes)
 		}
 	}
 }
 
 func TestParser_skipHeader_EmptyInput(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("")))
-	err := p.skipHeader()
-	if err == nil {
+	if err := p.skipHeader(); err == nil {
 		t.Errorf("error should not be nil")
 	}
 }
 
 func TestParser_skipHeader_HeaderNotFound(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x00\x00\x00\x00\x00\x00\x00\x00")))
-	err := p.skipHeader()
-	if err == nil {
+	if err := p.skipHeader(); err == nil {
 		t.Errorf("error should not be nil")
 	}
 }
 
 func TestParser_checkVersion(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x01")))
-	err := p.checkVersion()
-	if err != nil {
+	if err := p.checkVersion(); err != nil {
 		t.Errorf("error should be nil")
-	}
-	if p.reader.numReadBytes != 1 {
-		t.Errorf("the number of read bytes should be 1, but %d", p.reader.numReadBytes)
 	}
 }
 
 func TestParser_checkVersion_NotSupportedVersion(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x00")))
-	err := p.checkVersion()
-	if err == nil {
+	if err := p.checkVersion(); err == nil {
 		t.Errorf("error should not be nil")
 	}
 }
 
 func TestParser_skipDependencies(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x01\x00")))
-	err := p.skipDependencies()
-	if err != nil {
+	if err := p.skipDependencies(); err != nil {
 		t.Errorf("error should be nil")
-	}
-	if p.reader.numReadBytes != 2 {
-		t.Errorf("the number of read bytes should be 2, but %d", p.reader.numReadBytes)
 	}
 }
 
 func TestParser_skipDependencies_EmptyInput(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("")))
-	err := p.skipDependencies()
-	if err == nil {
+	if err := p.skipDependencies(); err == nil {
 		t.Errorf("error should not be nil")
 	}
 }
@@ -96,9 +81,6 @@ func TestParser_readReferences(t *testing.T) {
 	if p.symbolReferences[1].Name != "b" || p.symbolReferences[0].Version != 1 {
 		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
 	}
-	if p.reader.numReadBytes != 9 {
-		t.Errorf("the number of read bytes should be 8, but %d", p.reader.numReadBytes)
-	}
 }
 
 func TestParser_readReference(t *testing.T) {
@@ -113,9 +95,6 @@ func TestParser_readReference(t *testing.T) {
 	if p.symbolReferences[0].Name != "a" || p.symbolReferences[0].Version != 1 {
 		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
 	}
-	if p.reader.numReadBytes != 3 {
-		t.Errorf("the number of read bytes should be 3, but %d", p.reader.numReadBytes)
-	}
 }
 
 func TestParser_readData(t *testing.T) {
@@ -126,9 +105,6 @@ func TestParser_readData(t *testing.T) {
 	}
 	if !reflect.DeepEqual([]byte("a"), p.Data) {
 		t.Errorf("the data should be a, but %s", string(p.Data))
-	}
-	if p.reader.numReadBytes != 7 {
-		t.Errorf("the number of read bytes should be 7, but %d", p.reader.numReadBytes)
 	}
 }
 
@@ -143,19 +119,14 @@ func TestParser_readData_128KBData(t *testing.T) {
 	if !reflect.DeepEqual([]byte(data), p.Data) {
 		t.Errorf("the data should be a * 128K, but %s", string(p.Data))
 	}
-	if p.reader.numReadBytes != 128*1024+8 {
-		t.Errorf("the number of read bytes should be 128K, but %d", p.reader.numReadBytes)
-	}
 }
 
 func TestParser_readSymbol(t *testing.T) {
-	p := newParser(bufio.NewReader(strings.NewReader("")))
+	in := "\x01\x02"
+	p := newParser(bufio.NewReader(strings.NewReader(in)))
 	err := p.readSymbol()
 	if err != nil {
 		t.Errorf("error should be nil")
-	}
-	if p.reader.numReadBytes != 0 {
-		t.Errorf("the number of read bytes should be 0, but %d", p.reader.numReadBytes)
 	}
 }
 
@@ -220,5 +191,36 @@ func TestReaderWithCounter_readString_TooShortString(t *testing.T) {
 	_ = reader.readString()
 	if reader.err == nil {
 		t.Errorf("error should not be nil")
+	}
+}
+
+func TestReaderWithCounter_readByte(t *testing.T) {
+	value := "a"
+	reader := readerWithCounter{raw: bufio.NewReader(strings.NewReader(value))}
+	actual := reader.readByte()
+	if actual != value[0] {
+		t.Errorf("the value should be %v, but %v", value[0], actual)
+	}
+	if reader.err != nil {
+		t.Errorf("error should be nil, but %v", reader.err)
+	}
+	if reader.numReadBytes != 1 {
+		t.Errorf("the number of read bytes should be 1, but %d", reader.numReadBytes)
+	}
+}
+
+func TestReaderWithCounter_read(t *testing.T) {
+	value := []byte("abcdef")
+	reader := readerWithCounter{raw: bufio.NewReader(bytes.NewReader(value))}
+	buff := make([]byte, len(value))
+	_ = reader.read(buff)
+	if !reflect.DeepEqual(value, buff) {
+		t.Errorf("the value should be %v, but %v", value, buff)
+	}
+	if reader.err != nil {
+		t.Errorf("error should be nil, but %v", reader.err)
+	}
+	if reader.numReadBytes != int64(len(value)) {
+		t.Errorf("the number of read bytes should be %d, but %d", len(value), reader.numReadBytes)
 	}
 }
