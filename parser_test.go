@@ -66,9 +66,9 @@ func TestParser_skipDependencies_EmptyInput(t *testing.T) {
 	}
 }
 
-func TestParser_readReferences(t *testing.T) {
+func TestParser_parseReferences(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\xfe\x02a\x02\xfe\x02b\x02\xff")))
-	err := p.readReferences()
+	err := p.parseReferences()
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
@@ -83,9 +83,9 @@ func TestParser_readReferences(t *testing.T) {
 	}
 }
 
-func TestParser_readReference(t *testing.T) {
+func TestParser_parseReference(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x02a\x02")))
-	err := p.readReference()
+	err := p.parseReference()
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
@@ -97,9 +97,9 @@ func TestParser_readReference(t *testing.T) {
 	}
 }
 
-func TestParser_readData(t *testing.T) {
+func TestParser_parseData(t *testing.T) {
 	p := newParser(bufio.NewReader(strings.NewReader("\x02\x00\x00\x00\x00\x00a")))
-	err := p.readData()
+	err := p.parseData()
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
@@ -108,11 +108,11 @@ func TestParser_readData(t *testing.T) {
 	}
 }
 
-func TestParser_readData_128KBData(t *testing.T) {
+func TestParser_parseData_128KBData(t *testing.T) {
 	dataLength := "\x80\x80\x10" // 128KB
 	data := strings.Repeat("0123456789abcdef", 8*1024)
 	p := newParser(bufio.NewReader(strings.NewReader(dataLength + "\x00\x00\x00\x00\x00" + data)))
-	err := p.readData()
+	err := p.parseData()
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
@@ -121,12 +121,99 @@ func TestParser_readData_128KBData(t *testing.T) {
 	}
 }
 
-func TestParser_readSymbol(t *testing.T) {
-	in := "\x01\x02"
-	p := newParser(bufio.NewReader(strings.NewReader(in)))
-	err := p.readSymbol()
+func TestParser_parseSymbols(t *testing.T) {
+	p := newParser(bufio.NewReader(strings.NewReader("\xfe" + symbolForTesting() + "\xff")))
+	err := p.parseSymbols()
 	if err != nil {
 		t.Errorf("error should be nil")
+	}
+	if len(p.symbols) != 1 {
+		t.Errorf("the number of symbols should be 1, but %d", len(p.symbols))
+	}
+}
+
+func symbolForTesting() string {
+	return "\x02\x02\x0e\x02\x02\x02\x02\x02\x02\x02\x02\x02"
+}
+
+func TestParser_parseSymbol(t *testing.T) {
+	p := newParser(bufio.NewReader(strings.NewReader(symbolForTesting())))
+	err := p.parseSymbol()
+	if err != nil {
+		t.Errorf("error should be nil")
+	}
+	if len(p.symbols) != 1 {
+		t.Errorf("the number of symbols should be 1, but %d", len(p.symbols))
+	}
+
+	actual := p.symbols[0]
+	if SRODATA != actual.Kind {
+		t.Errorf("the kind should be %s, but %s", STEXT, actual.Kind)
+	}
+	if actual.IDIndex != 1 {
+		t.Errorf("the id index should be 1, but %d", actual.IDIndex)
+	}
+	if !actual.DupOK {
+		t.Errorf("DupOK flag should be true")
+	}
+	if !actual.Local {
+		t.Errorf("Local flag should be true")
+	}
+	if !actual.Typelink {
+		t.Errorf("Typelink flag should be true")
+	}
+	if actual.Size != 1 {
+		t.Errorf("the size should be 1, but %d", actual.Size)
+	}
+	if actual.GoTypeIndex != 1 {
+		t.Errorf("the GoType index should be 1, but %d", actual.GoTypeIndex)
+	}
+	expectedData := DataAddr{Size: 1, Offset: 0}
+	if expectedData != actual.Data {
+		t.Errorf("the data should be %+v, but %+v", expectedData, actual.Data)
+	}
+	if p.associatedDataSize != 1 {
+		t.Errorf("the associatedDataSize should be 1, but %d", p.associatedDataSize)
+	}
+	if len(actual.Relocations) != 1 {
+		t.Errorf("the number of relocations should be 1, but %d", len(actual.Relocations))
+	}
+	expectedReloc := Relocation{Offset: 1, Size: 1, Type: 1, Add: 1, IDIndex: 1}
+	if actual.Relocations[0] != expectedReloc {
+		t.Errorf("the relocation should be %+v, but %+v", expectedReloc, actual.Relocations[0])
+	}
+}
+
+func TestParser_parseSymbol_EmptyInput(t *testing.T) {
+	p := newParser(bufio.NewReader(strings.NewReader("")))
+	err := p.parseSymbol()
+	if err == nil {
+		t.Errorf("error should not be nil")
+	}
+}
+
+func TestParser_skipSTEXTFields(t *testing.T) {
+	in := "\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x02\x00\x00\x02\x00\x02\x00\x00\x00\x00"
+	p := newParser(bufio.NewReader(strings.NewReader(in)))
+	err := p.skipSTEXTFields()
+	if err != nil {
+		t.Errorf("error should be nil")
+	}
+}
+
+func TestParser_skipFooter(t *testing.T) {
+	p := newParser(bufio.NewReader(bytes.NewReader(magicFooter)))
+	err := p.skipFooter()
+	if err != nil {
+		t.Errorf("error should be nil")
+	}
+}
+
+func TestParser_skipFooter_wrongFooter(t *testing.T) {
+	p := newParser(bufio.NewReader(bytes.NewReader(append([]byte("\xfe"), magicFooter...))))
+	err := p.skipFooter()
+	if err == nil {
+		t.Errorf("error should not be nil")
 	}
 }
 

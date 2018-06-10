@@ -406,8 +406,10 @@ func Parse(f *os.File) (*File, error) {
 }
 
 type parser struct {
-	reader       readerWithCounter
-	currDataAddr int64
+	reader readerWithCounter
+	// As a list of symbols are parsed, a symbol is associated with some region of the data block.
+	// associatedDataSize is the total size of those regions.
+	associatedDataSize int64
 	File
 }
 
@@ -458,7 +460,7 @@ func (p *parser) skipDependencies() error {
 	}
 }
 
-func (p *parser) readReferences() error {
+func (p *parser) parseReferences() error {
 	for {
 		b := p.reader.readByte()
 		if p.reader.err != nil {
@@ -471,13 +473,13 @@ func (p *parser) readReferences() error {
 			return fmt.Errorf("sanity check failed: %#x ", b)
 		}
 
-		if err := p.readReference(); err != nil {
+		if err := p.parseReference(); err != nil {
 			return err
 		}
 	}
 }
 
-func (p *parser) readReference() error {
+func (p *parser) parseReference() error {
 	symbolName := p.reader.readString()
 	if p.reader.err != nil {
 		return p.reader.err
@@ -492,7 +494,7 @@ func (p *parser) readReference() error {
 	return nil
 }
 
-func (p *parser) readData() error {
+func (p *parser) parseData() error {
 	dataLength := p.reader.readVarint()
 	if p.reader.err != nil {
 		return p.reader.err
@@ -516,7 +518,130 @@ func (p *parser) readData() error {
 	return nil
 }
 
-func (p *parser) readSymbol() error {
+func (p *parser) parseSymbols() error {
+	for {
+		b := p.reader.readByte()
+		if p.reader.err != nil {
+			return p.reader.err
+		}
+
+		if b == 0xff {
+			return nil
+		} else if b != 0xfe {
+			return fmt.Errorf("sanity check failed: %#x ", b)
+		}
+
+		if err := p.parseSymbol(); err != nil {
+			return err
+		}
+	}
+}
+
+func (p *parser) parseSymbol() error {
+	symbol := Symbol{}
+	symbol.Kind = SymKind(p.reader.readByte())
+	symbol.IDIndex = p.reader.readVarint() // TODO: index -> reference. also the name 'reference' is confusing
+
+	flags := p.reader.readVarint()
+	symbol.DupOK = flags&0x1 != 0
+	symbol.Local = (flags>>1)&0x1 != 0
+	symbol.Typelink = (flags>>2)&0x1 != 0
+
+	symbol.Size = p.reader.readVarint()
+	symbol.GoTypeIndex = p.reader.readVarint()
+
+	dataSize := p.reader.readVarint()
+	symbol.Data = DataAddr{Size: dataSize, Offset: p.associatedDataSize} // TODO: Data -> DataAddr
+	p.associatedDataSize += dataSize
+
+	numRelocs := p.reader.readVarint()
+	for i := 0; i < int(numRelocs); i++ {
+		reloc := Relocation{}
+		reloc.Offset = p.reader.readVarint()
+		reloc.Size = p.reader.readVarint()
+		reloc.Type = RelocType(p.reader.readVarint())
+		reloc.Add = p.reader.readVarint()
+		reloc.IDIndex = p.reader.readVarint()
+
+		symbol.Relocations = append(symbol.Relocations, reloc)
+	}
+
+	if symbol.Kind == STEXT {
+		if err := p.skipSTEXTFields(); err != nil {
+			return err
+		}
+	}
+
+	p.symbols = append(p.symbols, symbol)
+	return p.reader.err
+}
+
+func (p *parser) skipSTEXTFields() error {
+	_ = p.reader.readVarint() // Args
+	_ = p.reader.readVarint() // Frame
+	_ = p.reader.readVarint() // Flags
+	_ = p.reader.readVarint() // NoSplit
+
+	numLocals := p.reader.readVarint()
+	for i := 0; i < int(numLocals); i++ {
+		_ = p.reader.readVarint() // sym
+		_ = p.reader.readVarint() // offset
+		_ = p.reader.readVarint() // type
+		_ = p.reader.readVarint() // go type
+	}
+
+	pcspSize := p.reader.readVarint()
+	p.associatedDataSize += pcspSize
+
+	pcFileSize := p.reader.readVarint()
+	p.associatedDataSize += pcFileSize
+
+	pcLineSize := p.reader.readVarint()
+	p.associatedDataSize += pcLineSize
+
+	pcInlineSize := p.reader.readVarint()
+	p.associatedDataSize += pcInlineSize
+
+	numPCData := p.reader.readVarint()
+	for i := 0; i < int(numPCData); i++ {
+		pcDataSize := p.reader.readVarint()
+		p.associatedDataSize += pcDataSize
+	}
+
+	numFuncData := p.reader.readVarint()
+	for i := 0; i < int(numFuncData); i++ {
+		_ = p.reader.readVarint() // func data index
+	}
+	for i := 0; i < int(numFuncData); i++ {
+		_ = p.reader.readVarint() // func offset
+	}
+
+	numFiles := p.reader.readVarint()
+	for i := 0; i < int(numFiles); i++ {
+		_ = p.reader.readVarint() // file index
+	}
+
+	numInlineTrees := p.reader.readVarint()
+	for i := 0; i < int(numInlineTrees); i++ {
+		_ = p.reader.readVarint() // parent
+		_ = p.reader.readVarint() // file
+		_ = p.reader.readVarint() // line
+		_ = p.reader.readVarint() // func
+	}
+
+	return p.reader.err
+}
+
+func (p *parser) skipFooter() error {
+	buff := make([]byte, len(magicFooter))
+	_ = p.reader.read(buff)
+	if p.reader.err != nil {
+		return p.reader.err
+	}
+
+	if !reflect.DeepEqual(buff, magicFooter) {
+		return fmt.Errorf("invalid footer: %#x", buff)
+	}
 	return nil
 }
 
