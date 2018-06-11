@@ -21,9 +21,11 @@ func main() {
 	}
 	defer f.Close()
 
-	_, err = goobj.Parse(f)
+	file, err := goobj.Parse(f)
 	if err != nil {
 		fmt.Printf("failed to parse goobj file: %v\n", err)
 		os.Exit(1)
 	}
+
+	goobj.PrintSymbols(file)
 }

@@ -67,7 +67,7 @@ func TestParser_skipDependencies_EmptyInput(t *testing.T) {
 }
 
 func TestParser_parseReferences(t *testing.T) {
-	p := newParser(bufio.NewReader(strings.NewReader("\xfe\x02a\x02\xfe\x02b\x02\xff")))
+	p := newParser(bufio.NewReader(strings.NewReader("\xfe\x02a\x02\xff")))
 	err := p.parseReferences()
 	if err != nil {
 		t.Errorf("error should be nil")
@@ -75,11 +75,12 @@ func TestParser_parseReferences(t *testing.T) {
 	if len(p.symbolReferences) != 2 {
 		t.Errorf("the number of symbolReferences should be 2, but %d", len(p.symbolReferences))
 	}
-	if p.symbolReferences[0].Name != "a" || p.symbolReferences[0].Version != 1 {
+	expect := SymbolReference{Name: "", Version: 0}
+	if p.symbolReferences[0] != expect {
 		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
 	}
-	if p.symbolReferences[1].Name != "b" || p.symbolReferences[0].Version != 1 {
-		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
+	if p.symbolReferences[1].Name != "a" || p.symbolReferences[1].Version != 1 {
+		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[1])
 	}
 }
 
@@ -169,8 +170,8 @@ func TestParser_parseSymbol(t *testing.T) {
 		t.Errorf("the GoType index should be 1, but %d", actual.GoTypeIndex)
 	}
 	expectedData := DataAddr{Size: 1, Offset: 0}
-	if expectedData != actual.Data {
-		t.Errorf("the data should be %+v, but %+v", expectedData, actual.Data)
+	if expectedData != actual.DataAddr {
+		t.Errorf("the data should be %+v, but %+v", expectedData, actual.DataAddr)
 	}
 	if p.associatedDataSize != 1 {
 		t.Errorf("the associatedDataSize should be 1, but %d", p.associatedDataSize)

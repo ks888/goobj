@@ -34,7 +34,7 @@ type Symbol struct {
 	Local       bool
 	Typelink    bool
 	GoTypeIndex int64
-	Data        DataAddr
+	DataAddr    DataAddr
 	Relocations []Relocation
 	// STEXT type has additional fields
 	stextFields *StextFields
@@ -486,6 +486,9 @@ func (p *parser) skipDependencies() error {
 }
 
 func (p *parser) parseReferences() error {
+	// the 1st reference is always empty.
+	p.symbolReferences = append(p.symbolReferences, SymbolReference{})
+
 	for {
 		b := p.reader.readByte()
 		if p.reader.err != nil {
@@ -565,7 +568,7 @@ func (p *parser) parseSymbols() error {
 func (p *parser) parseSymbol() error {
 	symbol := Symbol{}
 	symbol.Kind = SymKind(p.reader.readByte())
-	symbol.IDIndex = p.reader.readVarint() // TODO: index -> reference. also the name 'reference' is confusing
+	symbol.IDIndex = p.reader.readVarint()
 
 	flags := p.reader.readVarint()
 	symbol.DupOK = flags&0x1 != 0
@@ -576,7 +579,7 @@ func (p *parser) parseSymbol() error {
 	symbol.GoTypeIndex = p.reader.readVarint()
 
 	dataSize := p.reader.readVarint()
-	symbol.Data = DataAddr{Size: dataSize, Offset: p.associatedDataSize} // TODO: Data -> DataAddr
+	symbol.DataAddr = DataAddr{Size: dataSize, Offset: p.associatedDataSize}
 	p.associatedDataSize += dataSize
 
 	numRelocs := p.reader.readVarint()
