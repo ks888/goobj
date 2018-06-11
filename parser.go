@@ -2,6 +2,7 @@ package goobj
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -452,7 +453,7 @@ func (p *parser) skipHeader() error {
 	for !reflect.DeepEqual(buff, magicHeader) {
 		b := p.reader.readByte()
 		if p.reader.err != nil {
-			return p.reader.err
+			return errors.New("magic header not found")
 		}
 
 		buff = append(buff[1:], b)
