@@ -263,7 +263,7 @@ func TestReaderWithCounter_readString(t *testing.T) {
 		reader := readerWithCounter{raw: bufio.NewReader(strings.NewReader(testData.in))}
 		actual := reader.readString()
 		if actual != testData.expected {
-			t.Errorf("[%d] the value should be %d, but %d", i, testData.expected, actual)
+			t.Errorf("[%d] the value should be %s, but %s", i, testData.expected, actual)
 		}
 		if reader.err != nil {
 			t.Errorf("[%d] error should be nil, but %v", i, reader.err)
