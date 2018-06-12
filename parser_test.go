@@ -72,15 +72,15 @@ func TestParser_parseReferences(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if len(p.symbolReferences) != 2 {
-		t.Errorf("the number of symbolReferences should be 2, but %d", len(p.symbolReferences))
+	if len(p.SymbolReferences) != 2 {
+		t.Errorf("the number of symbolReferences should be 2, but %d", len(p.SymbolReferences))
 	}
 	expect := SymbolReference{Name: "", Version: 0}
-	if p.symbolReferences[0] != expect {
-		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
+	if p.SymbolReferences[0] != expect {
+		t.Errorf("invalid symbolReference: %+v", p.SymbolReferences[0])
 	}
-	if p.symbolReferences[1].Name != "a" || p.symbolReferences[1].Version != 1 {
-		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[1])
+	if p.SymbolReferences[1].Name != "a" || p.SymbolReferences[1].Version != 1 {
+		t.Errorf("invalid symbolReference: %+v", p.SymbolReferences[1])
 	}
 }
 
@@ -90,11 +90,11 @@ func TestParser_parseReference(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if len(p.symbolReferences) != 1 {
-		t.Errorf("the number of symbolReferences should be 1, but %d", len(p.symbolReferences))
+	if len(p.SymbolReferences) != 1 {
+		t.Errorf("the number of symbolReferences should be 1, but %d", len(p.SymbolReferences))
 	}
-	if p.symbolReferences[0].Name != "a" || p.symbolReferences[0].Version != 1 {
-		t.Errorf("invalid symbolReference: %+v", p.symbolReferences[0])
+	if p.SymbolReferences[0].Name != "a" || p.SymbolReferences[0].Version != 1 {
+		t.Errorf("invalid symbolReference: %+v", p.SymbolReferences[0])
 	}
 }
 
@@ -128,8 +128,8 @@ func TestParser_parseSymbols(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if len(p.symbols) != 1 {
-		t.Errorf("the number of symbols should be 1, but %d", len(p.symbols))
+	if len(p.Symbols) != 1 {
+		t.Errorf("the number of symbols should be 1, but %d", len(p.Symbols))
 	}
 }
 
@@ -143,11 +143,11 @@ func TestParser_parseSymbol(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if len(p.symbols) != 1 {
-		t.Errorf("the number of symbols should be 1, but %d", len(p.symbols))
+	if len(p.Symbols) != 1 {
+		t.Errorf("the number of symbols should be 1, but %d", len(p.Symbols))
 	}
 
-	actual := p.symbols[0]
+	actual := p.Symbols[0]
 	if SRODATA != actual.Kind {
 		t.Errorf("the kind should be %s, but %s", STEXT, actual.Kind)
 	}

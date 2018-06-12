@@ -14,9 +14,9 @@ func PrintSymbols(file *File) {
 	fmt.Println("The list of defined symbols:")
 
 	table := newTable(symbolHeaderRows)
-	for _, symbol := range file.symbols {
-		ref := file.symbolReferences[symbol.IDIndex]
-		goType := file.symbolReferences[symbol.GoTypeIndex]
+	for _, symbol := range file.Symbols {
+		ref := file.SymbolReferences[symbol.IDIndex]
+		goType := file.SymbolReferences[symbol.GoTypeIndex]
 
 		row := []string{
 			fmt.Sprintf("%#x", symbol.DataAddr.Offset),

@@ -15,8 +15,8 @@ var magicFooter = []byte("\xffgo19ld")
 
 // File represents a go object file.
 type File struct {
-	symbols          []Symbol
-	symbolReferences []SymbolReference
+	Symbols          []Symbol
+	SymbolReferences []SymbolReference
 	Data             []byte
 }
 
@@ -488,7 +488,7 @@ func (p *parser) skipDependencies() error {
 
 func (p *parser) parseReferences() error {
 	// the 1st reference is always empty.
-	p.symbolReferences = append(p.symbolReferences, SymbolReference{})
+	p.SymbolReferences = append(p.SymbolReferences, SymbolReference{})
 
 	for {
 		b := p.reader.readByte()
@@ -519,7 +519,7 @@ func (p *parser) parseReference() error {
 		return p.reader.err
 	}
 
-	p.symbolReferences = append(p.symbolReferences, SymbolReference{symbolName, symbolVersion})
+	p.SymbolReferences = append(p.SymbolReferences, SymbolReference{symbolName, symbolVersion})
 	return nil
 }
 
@@ -601,7 +601,7 @@ func (p *parser) parseSymbol() error {
 		}
 	}
 
-	p.symbols = append(p.symbols, symbol)
+	p.Symbols = append(p.Symbols, symbol)
 	return p.reader.err
 }
 
