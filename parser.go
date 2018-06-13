@@ -17,7 +17,9 @@ var magicFooter = []byte("\xffgo19ld")
 type File struct {
 	Symbols          []Symbol
 	SymbolReferences []SymbolReference
-	Data             []byte
+	DataBlock        []byte
+	// the data block starts at this position of the object file
+	DataBlockPosition int64
 }
 
 // SymbolReference represents a symbol's name and its version.
@@ -534,10 +536,11 @@ func (p *parser) parseData() error {
 	_ = p.reader.readVarint() // funcdata
 	_ = p.reader.readVarint() // files
 
-	p.Data = make([]byte, dataLength)
+	p.DataBlockPosition = p.reader.numReadBytes
+	p.DataBlock = make([]byte, dataLength)
 	numRead := 0
 	for numRead != int(dataLength) {
-		n := p.reader.read(p.Data[numRead:])
+		n := p.reader.read(p.DataBlock[numRead:])
 		if p.reader.err != nil {
 			return p.reader.err
 		}

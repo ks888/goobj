@@ -19,7 +19,7 @@ func PrintSymbols(file *File) {
 		goType := file.SymbolReferences[symbol.GoTypeIndex]
 
 		row := []string{
-			fmt.Sprintf("%#x", symbol.DataAddr.Offset),
+			fmt.Sprintf("%#x", file.DataBlockPosition+symbol.DataAddr.Offset),
 			fmt.Sprintf("%#x", symbol.Size),
 			fmt.Sprintf("%s", symbol.Kind),
 			fmt.Sprintf("%v", symbol.DupOK),

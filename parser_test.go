@@ -104,8 +104,8 @@ func TestParser_parseData(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if !reflect.DeepEqual([]byte("a"), p.Data) {
-		t.Errorf("the data should be a, but %s", string(p.Data))
+	if !reflect.DeepEqual([]byte("a"), p.DataBlock) {
+		t.Errorf("the data should be a, but %s", string(p.DataBlock))
 	}
 }
 
@@ -117,8 +117,8 @@ func TestParser_parseData_128KBData(t *testing.T) {
 	if err != nil {
 		t.Errorf("error should be nil")
 	}
-	if !reflect.DeepEqual([]byte(data), p.Data) {
-		t.Errorf("the data should be a * 128K, but %s", string(p.Data))
+	if !reflect.DeepEqual([]byte(data), p.DataBlock) {
+		t.Errorf("the data should be a * 128K, but %s", string(p.DataBlock))
 	}
 }
 
