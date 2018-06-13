@@ -9,7 +9,7 @@ A simple utility to read the contents of go object file.
 
 Go 1.9 or 1.10
 
-*Note: go object file is not formalized. This tool may not work well if the file format is updated in the future go releases.*
+*Note: the format of the go object file is not formalized. This tool may not work well if the format is updated in the future go releases.*
 
 ## Install
 
@@ -41,7 +41,7 @@ Compile it. It will generate helloworld.o file.
 % go tool compile helloworld.go
 ```
 
-Check all the defined symbols in the object file. Note that the command name is *readgoobj* rather than *goobj*.
+Now the `readgoobj` command prints all the defined symbols in the object file.
 
 ```
 % readgoobj helloworld.o

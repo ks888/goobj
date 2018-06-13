@@ -7,13 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 const testDataDir = "testdata"
-
-var cmdPath = filepath.Join(".", "readgoobj")
 
 func TestMain(m *testing.M) {
 	if err := exec.Command("go", "build").Run(); err != nil {
@@ -24,11 +23,11 @@ func TestMain(m *testing.M) {
 }
 
 var programList = []struct {
-	name, expect string
+	name, expected string
 }{
 	{
 		name: "helloworld.go",
-		expect: `The list of defined symbols:
+		expected: `The list of defined symbols:
  Offset Size Type        DupOK Local MakeTypeLink Name                                       Version GoType
  0x0    0x6e STEXT       false false false        "".main                                    0
  0x8d   0x5b STEXT       false false false        "".init                                    0
@@ -57,6 +56,9 @@ var programList = []struct {
 }
 
 func TestSamplePrograms(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	var cmdPath = filepath.Join(filepath.Dir(filename), "readgoobj")
+
 	for i, program := range programList {
 		goProgramName := filepath.Join(testDataDir, program.name)
 		objectFileName := filepath.Join(testDataDir, strings.Replace(program.name, ".go", ".o", 1))
@@ -70,7 +72,7 @@ func TestSamplePrograms(t *testing.T) {
 		}
 		actualOutput := strings.Split(string(out), "\n")
 
-		for j, expectedLine := range strings.Split(program.expect, "\n") {
+		for j, expectedLine := range strings.Split(program.expected, "\n") {
 			// ignore the number of spaces at the end of the line as it's trivial difference
 			if strings.TrimRight(expectedLine, " ") != strings.TrimRight(actualOutput[j], " ") {
 				t.Errorf("[%d] invalid output:\nexpect: %s\nactual: %s", i, expectedLine, actualOutput[j])
